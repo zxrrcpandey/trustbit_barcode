@@ -1,16 +1,12 @@
 [project]
 name = "trustbit_barcode"
-version = "1.0.2"
-description = "Direct thermal barcode label printing from ERPNext with QZ Tray"
 authors = [
-    {name = "Trustbit", email = "ra.pandey008@gmail.com"}
+    { name = "Trustbit", email = "ra.pandey008@gmail.com"}
 ]
-license = {text = "MIT"}
-readme = "README.md"
+description = "Direct thermal barcode label printing from ERPNext with QZ Tray"
 requires-python = ">=3.10"
-dependencies = [
-    "frappe",
-]
+readme = "README.md"
+dynamic = ["version"]
 
 [build-system]
 requires = ["flit_core >=3.4,<4"]

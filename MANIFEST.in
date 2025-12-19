@@ -1,6 +1,0 @@
-include README.md
-include LICENSE
-recursive-include trustbit_barcode *.json
-recursive-include trustbit_barcode *.py
-recursive-include trustbit_barcode *.js
-recursive-include trustbit_barcode *.txt

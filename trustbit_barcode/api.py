@@ -3,7 +3,7 @@
 # For license information, please see license.txt
 
 """
-Trustbit Advance Barcode Print - API v1.0.2
+Trustbit Advance Barcode Print - API v1.0.3
 Fetches barcodes, selling prices, and settings from database
 """
 

@@ -1,8 +1,8 @@
 /**
- * Trustbit Advance Barcode Print v1.0.2
- * Direct thermal barcode label printing from ERPNext with QZ Tray
- * Copyright (c) 2025 Trustbit - MIT License
- */
+* Trustbit Advance Barcode Print v1.0.3
+* Direct thermal barcode label printing from ERPNext with QZ Tray
+* Copyright (c) 2025 Trustbit - MIT License
+*/
 
 var trustbit_barcode = {
     settings: null,
@@ -49,12 +49,12 @@ var trustbit_barcode = {
         this.load_settings(function(settings) {
             let item_codes = frm.doc.items.map(item => item.item_code);
             
-            console.log("=== TRUSTBIT BARCODE v1.0.2 ===");
+            console.log("=== TRUSTBIT BARCODE v1.0.3 ===");
             console.log("Settings:", settings);
             
             frappe.call({
                 method: "trustbit_barcode.api.get_item_details",
-                args: { 
+                args: {
                     item_codes: JSON.stringify(item_codes),
                     price_list: settings.default_price_list
                 },
@@ -277,4 +277,4 @@ frappe.ui.form.on("Stock Entry", {
     }
 });
 
-console.log("Trustbit Barcode v1.0.2 loaded");
+console.log("Trustbit Barcode v1.0.3 loaded");

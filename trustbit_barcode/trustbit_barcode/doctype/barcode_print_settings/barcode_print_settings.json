@@ -1,71 +1,59 @@
 {
-    "actions": [],
-    "creation": "2025-12-18 12:00:00.000000",
-    "doctype": "DocType",
-    "engine": "InnoDB",
-    "field_order": [
-        "default_printer",
-        "column_break_1",
-        "default_price_list",
-        "section_break_sizes",
-        "label_sizes"
-    ],
-    "fields": [
-        {
-            "default": "Bar Code Printer TT065-50",
-            "fieldname": "default_printer",
-            "fieldtype": "Data",
-            "label": "Default Printer Name",
-            "reqd": 1
-        },
-        {
-            "fieldname": "column_break_1",
-            "fieldtype": "Column Break"
-        },
-        {
-            "default": "Standard Selling",
-            "fieldname": "default_price_list",
-            "fieldtype": "Link",
-            "label": "Default Price List",
-            "options": "Price List"
-        },
-        {
-            "fieldname": "section_break_sizes",
-            "fieldtype": "Section Break",
-            "label": "Label Sizes"
-        },
-        {
-            "fieldname": "label_sizes",
-            "fieldtype": "Table",
-            "label": "Label Sizes",
-            "options": "Barcode Label Size",
-            "reqd": 1
-        }
-    ],
-    "index_web_pages_for_search": 1,
-    "issingle": 1,
-    "links": [],
-    "modified": "2025-12-18 12:00:00.000000",
-    "modified_by": "Administrator",
-    "module": "Trustbit Barcode",
-    "name": "Barcode Print Settings",
-    "owner": "Administrator",
-    "permissions": [
-        {
-            "create": 1,
-            "delete": 1,
-            "email": 1,
-            "print": 1,
-            "read": 1,
-            "role": "System Manager",
-            "share": 1,
-            "write": 1
-        },
-        {
-            "read": 1,
-            "role": "All"
-        }
-    ],
-    "sort_field": "modified",
-    "sort_order": "DESC"
+ "actions": [],
+ "creation": "2025-01-01 00:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "default_printer",
+  "default_price_list",
+  "label_sizes_section",
+  "label_sizes"
+ ],
+ "fields": [
+  {
+   "fieldname": "default_printer",
+   "fieldtype": "Data",
+   "label": "Default Printer Name",
+   "reqd": 1
+  },
+  {
+   "fieldname": "default_price_list",
+   "fieldtype": "Link",
+   "label": "Default Price List",
+   "options": "Price List"
+  },
+  {
+   "fieldname": "label_sizes_section",
+   "fieldtype": "Section Break",
+   "label": "Label Sizes"
+  },
+  {
+   "fieldname": "label_sizes",
+   "fieldtype": "Table",
+   "label": "Label Sizes",
+   "options": "Barcode Label Size"
+  }
+ ],
+ "issingle": 1,
+ "links": [],
+ "modified": "2025-01-01 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Trustbit Barcode",
+ "name": "Barcode Print Settings",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "print": 1,
+   "read": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "track_changes": 1
 }

@@ -1,69 +1,78 @@
-# Trustbit Advance Barcode Print v1.0.2
+# Trustbit Barcode
 
-Direct thermal barcode label printing from ERPNext with QZ Tray and TSPL commands.
+Direct thermal barcode label printing from ERPNext with QZ Tray integration.
 
 ## Features
 
-- ✅ Print barcodes from **Purchase Invoice**, **Sales Invoice**, **Stock Entry**
-- ✅ Configurable **Label Sizes** via Barcode Print Settings
-- ✅ Multiple **Printer Support** per label size
-- ✅ Fetch **Selling Price** from Item Price table (Standard Selling)
-- ✅ **2-up printing** on thermal rolls (70mm width)
-- ✅ **QZ Tray** integration for raw TSPL printing
-- ✅ Editable rates before printing
+- Print barcode labels directly from Purchase Invoice, Sales Invoice, and Stock Entry
+- Configurable label sizes for different thermal printers
+- Fetches selling prices from Item Price table
+- Supports 2-column label layouts
+- Uses TSPL commands for thermal printers (TVS LP 46 Lite, TSC printers, etc.)
+- Auto-configures default settings on installation
+
+## Requirements
+
+- ERPNext v14 or v15
+- QZ Tray installed on client machines (https://qz.io/download/)
+- Thermal printer with TSPL support
 
 ## Installation
 
 ```bash
-bench get-app https://github.com/zxrrcpandey/Trustbit-barcode.git
-bench --site YOUR_SITE install-app trustbit_barcode
-bench --site YOUR_SITE migrate
-bench build
-sudo supervisorctl restart all
+# Get the app
+bench get-app https://github.com/zxrrcpandey/trustbit_barcode.git
+
+# Install on your site
+bench --site your-site-name install-app trustbit_barcode
+
+# Run migrate (creates DocTypes)
+bench --site your-site-name migrate
+
+# Restart bench
+bench restart
 ```
 
 ## Configuration
 
-1. Search for **"Barcode Print Settings"** in the search bar
-2. Set **Default Printer Name**: `Bar Code Printer TT065-50`
-3. Set **Default Price List**: `Standard Selling`
-4. Add **Label Sizes** in the table:
-   - Label Name: `35x15mm 2-up`
-   - Check "Default"
-   - Width: `70`, Height: `15`, Gap: `3`
-   - Labels Per Row: `2`
-   - Left X: `8`, Right X: `305`
-   - Speed: `4`, Density: `8`
-5. Click **Save**
+After installation, go to **Barcode Print Settings** to configure:
 
-## Requirements
+1. **Default Printer Name**: The exact printer name as shown in your system
+2. **Default Price List**: Price list to fetch selling prices from
+3. **Label Sizes**: Add your label configurations
 
-- ERPNext
-- [QZ Tray](https://qz.io/download/) installed and running on client machine
-- TSPL-compatible thermal printer (TVS LP 46 Lite, TSC, etc.)
+A default label size (35x15mm 2-up) is created automatically during installation.
 
 ## Usage
 
-1. Ensure **QZ Tray** is running on your Mac/PC
-2. Open a submitted **Purchase Invoice** (or Sales Invoice, Stock Entry)
-3. Click **Create → Print Barcode Labels**
-4. Select label size and items to print
-5. Adjust quantities or rates if needed
-6. Click **Print Barcodes**
+1. Open a **submitted** Purchase Invoice, Sales Invoice, or Stock Entry
+2. Click **Create → Print Barcode Labels**
+3. Select items and quantities
+4. Click **Print Barcodes**
 
-## Changelog
+## Printer Setup
 
-### v1.0.2
-- Added Barcode Print Settings DocType
-- Configurable label sizes and printers
-- Fetch selling price from Item Price table
+1. Install QZ Tray from https://qz.io/download/
+2. Add your thermal printer in system settings
+3. Note the exact printer name
+4. Update printer name in Barcode Print Settings
 
-### v1.0.1
-- Fixed price fetching from Standard Selling price list
+## Troubleshooting
 
-### v1.0.0
-- Initial release with QZ Tray integration
+**Button not showing:**
+- Clear browser cache (Ctrl+Shift+R)
+- Document must be submitted (docstatus = 1)
+- Run `bench build --app trustbit_barcode`
+
+**QZ Tray errors:**
+- Ensure QZ Tray is running
+- Check printer name matches exactly
+- Allow QZ Tray permissions in browser
+
+**No label sizes in dropdown:**
+- Go to Barcode Print Settings
+- Add at least one label size configuration
 
 ## License
 
-MIT License - Trustbit 2025
+MIT License - Copyright (c) 2025 Trustbit
