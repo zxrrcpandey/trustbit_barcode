@@ -1,7 +1,13 @@
 /**
-* Trustbit Barcode Print v1.0.5
+* Trustbit Barcode Print v1.0.6
 * Direct thermal barcode label printing from ERPNext with QZ Tray
 * Copyright (c) 2025 Trustbit - MIT License
+* 
+* New in v1.0.6:
+* - Configurable horizontal gaps (left margin, middle gap, right margin)
+* - Configurable Y positions for all elements
+* - Configurable barcode dimensions
+* - Auto-calculate label positions from margins
 */
 
 var trustbit_barcode = {
@@ -37,7 +43,23 @@ var trustbit_barcode = {
                 printer_name: "Bar Code Printer TT065-50",
                 width: 70, height: 15, gap: 3,
                 labels_per_row: 2, printable_height: 10,
-                left_label_x: 8, right_label_x: 305,
+                // Horizontal gaps
+                left_margin: 8,
+                middle_gap: 16,
+                right_margin: 8,
+                left_label_x: 8, 
+                right_label_x: 305,
+                // Barcode settings
+                barcode_width: 2,
+                barcode_height: 60,
+                // Y positions
+                name_y: 2,
+                barcode_y: 16,
+                barcode_text_y: 80,
+                price_y: 96,
+                // Text settings
+                text_max_chars: 14,
+                // Print settings
                 speed: 4, density: 8, is_default: true
             }]
         };
@@ -49,7 +71,7 @@ var trustbit_barcode = {
         this.load_settings(function(settings) {
             let item_codes = frm.doc.items.map(item => item.item_code);
             
-            console.log("=== TRUSTBIT BARCODE v1.0.5 ===");
+            console.log("=== TRUSTBIT BARCODE v1.0.6 ===");
             console.log("Settings:", settings);
             
             frappe.call({
@@ -172,7 +194,7 @@ var trustbit_barcode = {
             frappe.show_alert({ message: __("Printing to " + size_config.printer_name), indicator: "blue" });
             
             let tspl = self.generate_tspl(size_config, items);
-            console.log("TSPL:", tspl);
+            console.log("TSPL Commands:", tspl);
             
             let config = qz.configs.create(size_config.printer_name);
             return qz.print(config, [{ type: "raw", format: "command", data: tspl }]);
@@ -186,15 +208,56 @@ var trustbit_barcode = {
     },
 
     generate_tspl: function(size_config, items) {
+        // Get configuration values with defaults
+        let cfg = {
+            width: size_config.width || 70,
+            height: size_config.height || 15,
+            gap: size_config.gap || 3,
+            speed: size_config.speed || 4,
+            density: size_config.density || 8,
+            
+            // Horizontal positioning
+            left_margin: size_config.left_margin || 8,
+            middle_gap: size_config.middle_gap || 16,
+            right_margin: size_config.right_margin || 8,
+            left_label_x: size_config.left_label_x || 8,
+            right_label_x: size_config.right_label_x || 305,
+            
+            // Barcode settings
+            barcode_width: size_config.barcode_width || 2,
+            barcode_height: size_config.barcode_height || 60,
+            
+            // Y positions
+            name_y: size_config.name_y || 2,
+            barcode_y: size_config.barcode_y || 16,
+            barcode_text_y: size_config.barcode_text_y || 80,
+            price_y: size_config.price_y || 96,
+            
+            // Text settings
+            text_max_chars: size_config.text_max_chars || 14,
+            
+            // Layout
+            labels_per_row: size_config.labels_per_row || 2
+        };
+        
+        // If left_label_x is not explicitly set, calculate from left_margin
+        if (!size_config.left_label_x && size_config.left_margin) {
+            cfg.left_label_x = cfg.left_margin;
+        }
+        
+        // Log configuration for debugging
+        console.log("Label Config:", cfg);
+        
         let cmds = [
-            "SIZE " + size_config.width + " mm, " + size_config.height + " mm",
-            "GAP " + size_config.gap + " mm, 0 mm",
-            "SPEED " + size_config.speed,
-            "DENSITY " + size_config.density,
+            "SIZE " + cfg.width + " mm, " + cfg.height + " mm",
+            "GAP " + cfg.gap + " mm, 0 mm",
+            "SPEED " + cfg.speed,
+            "DENSITY " + cfg.density,
             "DIRECTION 1",
             ""
         ];
         
+        // Build label array with quantities expanded
         let labels = [];
         items.forEach(item => {
             let qty = parseInt(item.print_qty) || 1;
@@ -208,29 +271,34 @@ var trustbit_barcode = {
             }
         });
         
-        let per_row = size_config.labels_per_row || 2;
+        let per_row = cfg.labels_per_row;
         
+        // Generate TSPL for each row of labels
         for (let i = 0; i < labels.length; i += per_row) {
             cmds.push("CLS");
             
+            // Left label
             let l1 = labels[i];
-            let name1 = this.escape_text(l1.name.substring(0, 14));
+            let name1 = this.escape_text(l1.name.substring(0, cfg.text_max_chars));
             let rate1 = parseFloat(l1.rate).toFixed(0);
+            let x1 = cfg.left_label_x;
             
-            cmds.push('TEXT ' + size_config.left_label_x + ',2,"1",0,1,1,"' + name1 + '"');
-            cmds.push('BARCODE ' + size_config.left_label_x + ',16,"128",60,0,0,2,4,"' + l1.barcode + '"');
-            cmds.push('TEXT ' + size_config.left_label_x + ',80,"1",0,1,1,"' + l1.barcode + '"');
-            cmds.push('TEXT ' + size_config.left_label_x + ',96,"1",0,1,1,"' + l1.item_code + ' Rs' + rate1 + '"');
+            cmds.push('TEXT ' + x1 + ',' + cfg.name_y + ',"1",0,1,1,"' + name1 + '"');
+            cmds.push('BARCODE ' + x1 + ',' + cfg.barcode_y + ',"128",' + cfg.barcode_height + ',0,0,' + cfg.barcode_width + ',4,"' + l1.barcode + '"');
+            cmds.push('TEXT ' + x1 + ',' + cfg.barcode_text_y + ',"1",0,1,1,"' + l1.barcode + '"');
+            cmds.push('TEXT ' + x1 + ',' + cfg.price_y + ',"1",0,1,1,"' + l1.item_code + ' Rs' + rate1 + '"');
             
+            // Right label (if 2-up and more labels exist)
             if (per_row >= 2 && i + 1 < labels.length) {
                 let l2 = labels[i + 1];
-                let name2 = this.escape_text(l2.name.substring(0, 14));
+                let name2 = this.escape_text(l2.name.substring(0, cfg.text_max_chars));
                 let rate2 = parseFloat(l2.rate).toFixed(0);
+                let x2 = cfg.right_label_x;
                 
-                cmds.push('TEXT ' + size_config.right_label_x + ',2,"1",0,1,1,"' + name2 + '"');
-                cmds.push('BARCODE ' + size_config.right_label_x + ',16,"128",60,0,0,2,4,"' + l2.barcode + '"');
-                cmds.push('TEXT ' + size_config.right_label_x + ',80,"1",0,1,1,"' + l2.barcode + '"');
-                cmds.push('TEXT ' + size_config.right_label_x + ',96,"1",0,1,1,"' + l2.item_code + ' Rs' + rate2 + '"');
+                cmds.push('TEXT ' + x2 + ',' + cfg.name_y + ',"1",0,1,1,"' + name2 + '"');
+                cmds.push('BARCODE ' + x2 + ',' + cfg.barcode_y + ',"128",' + cfg.barcode_height + ',0,0,' + cfg.barcode_width + ',4,"' + l2.barcode + '"');
+                cmds.push('TEXT ' + x2 + ',' + cfg.barcode_text_y + ',"1",0,1,1,"' + l2.barcode + '"');
+                cmds.push('TEXT ' + x2 + ',' + cfg.price_y + ',"1",0,1,1,"' + l2.item_code + ' Rs' + rate2 + '"');
             }
             
             cmds.push("PRINT 1");
@@ -279,4 +347,4 @@ frappe.ui.form.on("Stock Entry", {
     }
 });
 
-console.log("Trustbit Barcode v1.0.5 loaded");
+console.log("Trustbit Barcode v1.0.6 loaded");

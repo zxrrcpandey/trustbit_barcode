@@ -4,7 +4,7 @@ app_publisher = "Trustbit"
 app_description = "Direct thermal barcode label printing from ERPNext with QZ Tray"
 app_email = "ra.pandey008@gmail.com"
 app_license = "mit"
-app_version = "1.0.5"
+app_version = "1.0.6"
 
 required_apps = ["erpnext"]
 

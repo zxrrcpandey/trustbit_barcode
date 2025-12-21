@@ -3,8 +3,9 @@
 # For license information, please see license.txt
 
 """
-Trustbit Barcode - API v1.0.5
+Trustbit Barcode - API v1.0.6
 Fetches barcodes, selling prices, and settings from database
+New: Added support for configurable gaps and positions
 """
 
 from __future__ import unicode_literals
@@ -112,7 +113,7 @@ def get_item_details(item_codes, price_list=None):
 
 @frappe.whitelist()
 def get_barcode_print_settings():
-    """Get all barcode print settings."""
+    """Get all barcode print settings including new gap and position fields."""
     try:
         settings = frappe.get_single("Barcode Print Settings")
         
@@ -128,8 +129,28 @@ def get_barcode_print_settings():
                 "gap": size.gap_height,
                 "labels_per_row": size.labels_per_row,
                 "printable_height": size.printable_height,
-                "left_label_x": size.left_label_x,
-                "right_label_x": size.right_label_x,
+                
+                # Horizontal gaps (new in v1.0.6)
+                "left_margin": size.left_margin or 8,
+                "middle_gap": size.middle_gap or 16,
+                "right_margin": size.right_margin or 8,
+                "left_label_x": size.left_label_x or 8,
+                "right_label_x": size.right_label_x or 305,
+                
+                # Barcode settings (new in v1.0.6)
+                "barcode_width": size.barcode_width or 2,
+                "barcode_height": size.barcode_height or 60,
+                
+                # Y positions (new in v1.0.6)
+                "name_y": size.name_y_position or 2,
+                "barcode_y": size.barcode_y_position or 16,
+                "barcode_text_y": size.barcode_text_y_position or 80,
+                "price_y": size.price_y_position or 96,
+                
+                # Text settings (new in v1.0.6)
+                "text_max_chars": size.text_max_chars or 14,
+                
+                # Print settings
                 "speed": size.print_speed,
                 "density": size.print_density,
                 "is_default": size.is_default
@@ -157,7 +178,11 @@ def get_barcode_print_settings():
                     "printer_name": "Bar Code Printer TT065-50",
                     "width": 70, "height": 15, "gap": 3,
                     "labels_per_row": 2, "printable_height": 10,
+                    "left_margin": 8, "middle_gap": 16, "right_margin": 8,
                     "left_label_x": 8, "right_label_x": 305,
+                    "barcode_width": 2, "barcode_height": 60,
+                    "name_y": 2, "barcode_y": 16, "barcode_text_y": 80, "price_y": 96,
+                    "text_max_chars": 14,
                     "speed": 4, "density": 8, "is_default": True
                 }
             ]

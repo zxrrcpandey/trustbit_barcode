@@ -11,12 +11,25 @@
   "label_width",
   "label_height",
   "gap_height",
+  "section_break_gaps",
+  "left_margin",
+  "middle_gap",
+  "right_margin",
+  "column_break_gaps",
+  "left_label_x",
+  "right_label_x",
   "section_break_1",
   "labels_per_row",
   "printable_height",
   "column_break_2",
-  "left_label_x",
-  "right_label_x",
+  "barcode_width",
+  "barcode_height",
+  "section_break_text",
+  "text_max_chars",
+  "name_y_position",
+  "barcode_y_position",
+  "barcode_text_y_position",
+  "price_y_position",
   "section_break_2",
   "print_speed",
   "print_density"
@@ -50,8 +63,9 @@
    "fieldname": "label_width",
    "fieldtype": "Int",
    "in_list_view": 1,
-   "label": "Width (mm)",
-   "reqd": 1
+   "label": "Total Width (mm)",
+   "reqd": 1,
+   "description": "Total label roll width (e.g., 70mm for 2-up)"
   },
   {
    "fieldname": "label_height",
@@ -63,12 +77,57 @@
   {
    "fieldname": "gap_height",
    "fieldtype": "Int",
-   "label": "Gap (mm)"
+   "label": "Vertical Gap (mm)",
+   "description": "Gap between labels vertically"
+  },
+  {
+   "fieldname": "section_break_gaps",
+   "fieldtype": "Section Break",
+   "label": "Horizontal Gap Settings (dots)"
+  },
+  {
+   "fieldname": "left_margin",
+   "fieldtype": "Int",
+   "label": "Left Margin",
+   "default": "8",
+   "description": "Gap from left edge to first label (dots)"
+  },
+  {
+   "fieldname": "middle_gap",
+   "fieldtype": "Int",
+   "label": "Middle Gap",
+   "default": "16",
+   "description": "Gap between left and right labels (dots)"
+  },
+  {
+   "fieldname": "right_margin",
+   "fieldtype": "Int",
+   "label": "Right Margin",
+   "default": "8",
+   "description": "Gap from last label to right edge (dots)"
+  },
+  {
+   "fieldname": "column_break_gaps",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "left_label_x",
+   "fieldtype": "Int",
+   "label": "Left Label X",
+   "default": "8",
+   "description": "X position for left label content (dots)"
+  },
+  {
+   "fieldname": "right_label_x",
+   "fieldtype": "Int",
+   "label": "Right Label X",
+   "default": "305",
+   "description": "X position for right label content (dots)"
   },
   {
    "fieldname": "section_break_1",
    "fieldtype": "Section Break",
-   "label": "Position Settings"
+   "label": "Layout Settings"
   },
   {
    "default": "2",
@@ -86,14 +145,58 @@
    "fieldtype": "Column Break"
   },
   {
-   "fieldname": "left_label_x",
+   "fieldname": "barcode_width",
    "fieldtype": "Int",
-   "label": "Left Label X (dots)"
+   "label": "Barcode Module Width",
+   "default": "2",
+   "description": "Width of narrowest bar (1-4)"
   },
   {
-   "fieldname": "right_label_x",
+   "fieldname": "barcode_height",
    "fieldtype": "Int",
-   "label": "Right Label X (dots)"
+   "label": "Barcode Height",
+   "default": "60",
+   "description": "Height of barcode in dots"
+  },
+  {
+   "fieldname": "section_break_text",
+   "fieldtype": "Section Break",
+   "label": "Text & Position Settings"
+  },
+  {
+   "fieldname": "text_max_chars",
+   "fieldtype": "Int",
+   "label": "Max Item Name Characters",
+   "default": "14",
+   "description": "Maximum characters for item name"
+  },
+  {
+   "fieldname": "name_y_position",
+   "fieldtype": "Int",
+   "label": "Item Name Y Position",
+   "default": "2",
+   "description": "Y position for item name (dots from top)"
+  },
+  {
+   "fieldname": "barcode_y_position",
+   "fieldtype": "Int",
+   "label": "Barcode Y Position",
+   "default": "16",
+   "description": "Y position for barcode (dots from top)"
+  },
+  {
+   "fieldname": "barcode_text_y_position",
+   "fieldtype": "Int",
+   "label": "Barcode Text Y Position",
+   "default": "80",
+   "description": "Y position for barcode number (dots from top)"
+  },
+  {
+   "fieldname": "price_y_position",
+   "fieldtype": "Int",
+   "label": "Price Y Position",
+   "default": "96",
+   "description": "Y position for price line (dots from top)"
   },
   {
    "fieldname": "section_break_2",
