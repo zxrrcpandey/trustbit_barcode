@@ -1,5 +1,5 @@
 /**
-* Trustbit Barcode Print v1.0.6
+* Trustbit Barcode Print v1.0.7
 * Direct thermal barcode label printing from ERPNext with QZ Tray
 * Copyright (c) 2025 Trustbit - MIT License
 * 
@@ -7,18 +7,14 @@
 * - Configurable horizontal gaps (left margin, middle gap, right margin)
 * - Configurable Y positions for all elements
 * - Configurable barcode dimensions
-* - Auto-calculate label positions from margins
+* - Fixed settings caching issue - always fetches fresh settings
 */
 
 var trustbit_barcode = {
     settings: null,
     
     load_settings: function(callback) {
-        if (this.settings) {
-            callback(this.settings);
-            return;
-        }
-        
+        // Always fetch fresh settings (no cache) for immediate updates
         frappe.call({
             method: "trustbit_barcode.api.get_barcode_print_settings",
             async: false,
