@@ -81,12 +81,14 @@ var trustbit_barcode = {
                     
                     let items = frm.doc.items.map(item => {
                         let details = item_details[item.item_code] || {};
+                        // Goods received at their own printed price (shelf prices,
+                        // v1.1.0) get that price and, if made, its own barcode.
                         return {
                             item_code: item.item_code,
                             item_name: item.item_name,
                             qty: item.qty,
-                            rate: details.selling_rate || 0,
-                            barcode: details.barcode || item.item_code
+                            rate: flt(item.custom_pack_mrp) || details.selling_rate || 0,
+                            barcode: item.custom_shelf_barcode || details.barcode || item.item_code
                         };
                     });
                     
@@ -309,6 +311,17 @@ var trustbit_barcode = {
         return text.replace(/"/g, "'").replace(/\\/g, "");
     }
 };
+
+// Register handlers for Purchase Receipt
+frappe.ui.form.on("Purchase Receipt", {
+    refresh: function(frm) {
+        if (frm.doc.docstatus === 1) {
+            frm.add_custom_button(__("Print Barcode Labels"), function() {
+                trustbit_barcode.show_barcode_dialog(frm);
+            }, __("Create"));
+        }
+    }
+});
 
 // Register handlers for Purchase Invoice
 frappe.ui.form.on("Purchase Invoice", {

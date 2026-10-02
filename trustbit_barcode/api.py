@@ -11,6 +11,7 @@ New: Added support for configurable gaps and positions
 from __future__ import unicode_literals
 import frappe
 import json
+from frappe.utils import flt
 
 
 @frappe.whitelist()
@@ -100,7 +101,18 @@ def get_item_details(item_codes, price_list=None):
     for b in barcodes:
         if b.parent not in barcode_map:
             barcode_map[b.parent] = b.barcode
-    
+
+    # Shelf prices (v1.1.0): when the current selling price has its own barcode,
+    # a label printed at that price must carry that barcode.
+    if frappe.db.table_exists("Shelf Price"):
+        for s in frappe.db.sql("""
+            SELECT item_code, price, barcode
+            FROM `tabShelf Price`
+            WHERE item_code IN %s AND price_list = %s AND active = 1 AND IFNULL(barcode, '') != ''
+        """, [item_codes, price_list], as_dict=True):
+            if abs(flt(s.price) - flt(price_map.get(s.item_code))) < 0.005:
+                barcode_map[s.item_code] = s.barcode
+
     result = {}
     for item_code in item_codes:
         result[item_code] = {
