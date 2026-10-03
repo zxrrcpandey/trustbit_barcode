@@ -65,29 +65,30 @@ var trustbit_barcode = {
         let self = this;
         
         this.load_settings(function(settings) {
-            let item_codes = frm.doc.items.map(item => item.item_code);
-            
-            console.log("=== TRUSTBIT BARCODE v1.0.6 ===");
-            console.log("Settings:", settings);
-            
+            // One label row per line: goods received at their own printed price
+            // (shelf prices) are labelled at that price, with a barcode that
+            // sells at that price (never one bound to another price).
+            let label_rows = frm.doc.items.map(item => ({
+                item_code: item.item_code,
+                price: flt(item.custom_pack_mrp) || null
+            }));
+
             frappe.call({
-                method: "trustbit_barcode.api.get_item_details",
+                method: "trustbit_barcode.api.get_label_data",
                 args: {
-                    item_codes: JSON.stringify(item_codes),
+                    rows: JSON.stringify(label_rows),
                     price_list: settings.default_price_list
                 },
                 callback: function(r) {
-                    let item_details = r.message || {};
-                    
-                    let items = frm.doc.items.map(item => {
-                        let details = item_details[item.item_code] || {};
-                        // Goods received at their own printed price (shelf prices,
-                        // v1.1.0) get that price and, if made, its own barcode.
+                    let label_data = r.message || [];
+
+                    let items = frm.doc.items.map((item, i) => {
+                        let details = label_data[i] || {};
                         return {
                             item_code: item.item_code,
                             item_name: item.item_name,
                             qty: item.qty,
-                            rate: flt(item.custom_pack_mrp) || details.selling_rate || 0,
+                            rate: details.selling_rate || 0,
                             barcode: item.custom_shelf_barcode || details.barcode || item.item_code
                         };
                     });

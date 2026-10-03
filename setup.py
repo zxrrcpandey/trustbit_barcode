@@ -8,7 +8,7 @@ install_requires = [x for x in install_requires if x and not x.startswith("#")]
 
 setup(
     name="trustbit_barcode",
-    version="1.1.0",
+    version="1.1.1",
     description="Direct thermal barcode label printing from ERPNext with QZ Tray",
     author="Trustbit",
     author_email="ra.pandey008@gmail.com",

@@ -83,10 +83,17 @@ def shelf_rows(item_code, price_list, active_only=True):
 	)
 
 
+def _staff_only():
+	"""Shelf prices and their barcodes are for desk users, not website customers."""
+	if frappe.session.user == "Guest" or frappe.get_cached_value("User", frappe.session.user, "user_type") != "System User":
+		frappe.throw(_("Not permitted"), frappe.PermissionError)
+
+
 @frappe.whitelist()
 def get_active_shelf_prices(price_list=None):
 	"""Every active shelf price, grouped by item — for the POS (one small query,
 	refreshed every few minutes, independent of the POS item catalogue)."""
+	_staff_only()
 	price_list = price_list or default_price_list()
 	rows = frappe.db.sql(
 		"""
@@ -107,6 +114,7 @@ def get_active_shelf_prices(price_list=None):
 @frappe.whitelist()
 def get_shelf_prices(item_code, price_list=None):
 	"""Active shelf prices of one item (desk forms)."""
+	_staff_only()
 	price_list = price_list or default_price_list()
 	return [
 		{"name": r.name, "price": flt(r.price), "barcode": r.barcode or ""}
@@ -230,8 +238,18 @@ def describe(item_label, plan, new_barcode=None, future=True):
 	return text
 
 
-def _priced_rows(doc):
+def _receives_stock(doc):
+	"""Prices change where the goods come in: a Purchase Receipt, or a Purchase
+	Invoice that updates stock. A bill for goods already received by a Purchase
+	Receipt (update_stock off) must not apply the receipt's price again — by then
+	the price may have moved on, and re-applying it would undo that."""
 	if cint(doc.get("is_return")):
+		return False
+	return doc.doctype == "Purchase Receipt" or cint(doc.get("update_stock"))
+
+
+def _priced_rows(doc):
+	if not _receives_stock(doc):
 		return []
 	return [
 		row for row in doc.get("items") or []
@@ -239,14 +257,57 @@ def _priced_rows(doc):
 	]
 
 
+def _copy_from_receipt(doc):
+	"""Bill made from a Purchase Receipt: show the receipt line's price barcode,
+	so labels printed from the bill carry the same barcode."""
+	if doc.doctype != "Purchase Invoice" or cint(doc.get("update_stock")):
+		return
+	for row in doc.get("items") or []:
+		if row.get("pr_detail") and not row.get(BARCODE_FIELD):
+			barcode = frappe.db.get_value("Purchase Receipt Item", row.pr_detail, BARCODE_FIELD)
+			if barcode:
+				row.set(BARCODE_FIELD, barcode)
+
+
+def _check_pack_price(doc, price_list):
+	"""The printed price is per STOCK unit. On a Box/Packet line the price of the
+	whole pack is an easy mistake that would make it the price of one piece."""
+	for row in _priced_rows(doc):
+		cf = flt(row.get("conversion_factor")) or 1
+		if cf <= 1:
+			continue
+		mrp = flt(row.get(PRICE_FIELD))
+		current = current_selling_price(row.item_code, price_list)
+		if current and abs(mrp - current * cf) < abs(mrp - current):
+			frappe.throw(
+				_(
+					"Row #{0} {1}: {2} looks like the price of the whole {3} ({4} {5}). Enter the price printed on ONE {5} — today it is {6}."
+				).format(
+					row.idx,
+					row.item_name or row.item_code,
+					fmt_money(mrp, currency="INR"),
+					row.uom,
+					frappe.format_value(cf),
+					row.stock_uom,
+					fmt_money(current, currency="INR"),
+				),
+				title=_("Selling Price on Pack is per piece"),
+			)
+
+
 def preview_on_save(doc, method=None):
-	"""Draft save: show what submitting this receipt will do to selling prices."""
-	if doc.docstatus != 0 or doc.flags.in_import:
+	"""validate: copy a receipt's price barcode onto its bill, refuse a pack price
+	on a pack line, and on a draft save show what submitting will change."""
+	_copy_from_receipt(doc)
+	if doc.flags.in_import:
+		return
+	price_list = default_price_list()
+	_check_pack_price(doc, price_list)
+	if doc.docstatus != 0:
 		return
 	rows = _priced_rows(doc)
 	if not rows:
 		return
-	price_list = default_price_list()
 	lines, seen = [], set()
 	for row in rows:
 		new_price = flt(row.get(PRICE_FIELD), 2)
@@ -285,15 +346,20 @@ def apply_on_submit(doc, method=None):
 	price_list = default_price_list()
 	today = nowdate()
 	lines = []
-	for row in rows:
+	# Lowest price first: a receipt holding the same item at two prices keeps
+	# both on the shelf, whatever order the lines were typed in.
+	for row in sorted(rows, key=lambda r: (r.item_code, flt(r.get(PRICE_FIELD)), r.idx)):
 		label = f"#{row.idx} {row.item_name or row.item_code}"
 		# A price problem must never stop the goods from being received: roll the
 		# line back, log it, say so, and carry on.
+		messages_before = len(frappe.local.message_log or [])
 		frappe.db.savepoint("shelf_price_row")
 		try:
 			text = _apply_row(doc, row, price_list, today)
 		except Exception:
 			frappe.db.rollback(save_point="shelf_price_row")
+			# A caught frappe.throw has already queued its red message box.
+			del (frappe.local.message_log or [])[messages_before:]
 			frappe.log_error(title=f"Shelf price: {doc.doctype} {doc.name} row {row.idx}")
 			text = "<span style='color: var(--red-600)'>" + _(
 				"{0}: selling price NOT changed — an error was logged. Set it by hand."
@@ -307,14 +373,52 @@ def apply_on_submit(doc, method=None):
 		frappe.msgprint("<br>".join(lines), title=_("Selling prices updated"), indicator="green")
 
 
+def warn_on_cancel(doc, method=None):
+	"""Cancelling a receipt does not undo the selling prices it set (later
+	receipts or bills may rely on them) — say which ones are still in force."""
+	if not _receives_stock(doc):
+		return
+	reference = f"{doc.doctype} {doc.name}"
+	price_list = default_price_list()
+	lines = []
+	for ip in frappe.get_all(
+		"Item Price",
+		filters={"note": ["like", f"%{_price_note(reference)}%"], "price_list": price_list},
+		fields=["name", "item_code", "price_list_rate"],
+	):
+		if same_price(current_selling_price(ip.item_code, price_list), ip.price_list_rate):
+			lines.append(
+				_("{0}: selling price {1} (Item Price {2})").format(
+					ip.item_code, fmt_money(ip.price_list_rate, currency="INR"), ip.name
+				)
+			)
+	for sp in frappe.get_all(
+		"Shelf Price",
+		filters={"source_doctype": doc.doctype, "source_name": doc.name, "active": 1},
+		fields=["name", "item_code", "price"],
+	):
+		lines.append(
+			_("{0}: shelf price {1} ({2})").format(sp.item_code, fmt_money(sp.price, currency="INR"), sp.name)
+		)
+	if lines:
+		frappe.msgprint(
+			_("These prices were set by this document and are still in force. Change them by hand if they were wrong:")
+			+ "<br>" + "<br>".join(lines),
+			title=_("Selling prices not undone"),
+			indicator="orange",
+		)
+
+
 def _apply_row(doc, row, price_list, today):
 	"""Apply one receipt line; returns the line for the summary message (or None)."""
+	# Two receipts for the same item at the same moment take turns.
+	frappe.db.sql("SELECT name FROM `tabItem` WHERE name = %s FOR UPDATE", row.item_code)
 	new_price = flt(row.get(PRICE_FIELD), 2)
 	plan = plan_price_change(row.item_code, new_price, price_list)
 	want_barcode = cint(row.get(NEW_BARCODE_FIELD))
 
 	if plan.set_item_price:
-		_set_item_price(row.item_code, price_list, new_price, today)
+		_set_item_price(row.item_code, price_list, new_price, today, f"{doc.doctype} {doc.name}")
 	if plan.keep_old is not None:
 		_ensure_shelf_row(row.item_code, price_list, plan.keep_old, doc, today)
 	for r in plan.deactivate:
@@ -365,10 +469,16 @@ def _ensure_shelf_row(item_code, price_list, price, doc, on_date):
 	return row
 
 
-def _set_item_price(item_code, price_list, price, on_date):
+def _price_note(reference):
+	return f"Shelf price set by {reference}"
+
+
+def _set_item_price(item_code, price_list, price, on_date, reference=None):
 	"""Make `price` the selling price from `on_date` on. Adds a dated Item Price
 	row (older rows stay as history — the School Book Sales Report reads the
-	price on its To Date), or updates today's row if there already is one."""
+	price on its To Date), or updates today's row if there already is one.
+	`reference` names the receipt (kept in the Item Price note — ERPNext rewrites
+	the reference field on save), so a cancel can say which prices it set."""
 	stock_uom = frappe.db.get_value("Item", item_code, "stock_uom")
 	for r in frappe.get_all(
 		"Item Price",
@@ -378,6 +488,8 @@ def _set_item_price(item_code, price_list, price, on_date):
 		if (r.uom or stock_uom) == stock_uom and not (r.customer or r.supplier or r.batch_no or r.valid_upto):
 			ip = frappe.get_doc("Item Price", r.name)
 			ip.price_list_rate = price
+			if reference:
+				ip.note = _price_note(reference)
 			ip.save(ignore_permissions=True)
 			return ip
 	ip = frappe.get_doc(
@@ -388,6 +500,7 @@ def _set_item_price(item_code, price_list, price, on_date):
 			"uom": stock_uom,
 			"price_list_rate": price,
 			"valid_from": on_date,
+			"note": _price_note(reference) if reference else None,
 		}
 	)
 	ip.insert(ignore_permissions=True)

@@ -97,30 +97,80 @@ def get_item_details(item_codes, price_list=None):
         ORDER BY idx ASC
     """, [item_codes], as_dict=True)
     
-    barcode_map = {}
+    all_barcodes = {}
     for b in barcodes:
-        if b.parent not in barcode_map:
-            barcode_map[b.parent] = b.barcode
-
-    # Shelf prices (v1.1.0): when the current selling price has its own barcode,
-    # a label printed at that price must carry that barcode.
-    if frappe.db.table_exists("Shelf Price"):
-        for s in frappe.db.sql("""
-            SELECT item_code, price, barcode
-            FROM `tabShelf Price`
-            WHERE item_code IN %s AND price_list = %s AND active = 1 AND IFNULL(barcode, '') != ''
-        """, [item_codes, price_list], as_dict=True):
-            if abs(flt(s.price) - flt(price_map.get(s.item_code))) < 0.005:
-                barcode_map[s.item_code] = s.barcode
+        all_barcodes.setdefault(b.parent, []).append(b.barcode)
+    bound = _active_price_barcodes(item_codes, price_list)
 
     result = {}
     for item_code in item_codes:
+        rate = price_map.get(item_code, 0)
         result[item_code] = {
-            "barcode": barcode_map.get(item_code, item_code),
-            "selling_rate": price_map.get(item_code, 0)
+            "barcode": _label_barcode(item_code, rate, all_barcodes.get(item_code, []), bound),
+            "selling_rate": rate
         }
-    
+
     return result
+
+
+def _active_price_barcodes(item_codes, price_list):
+    """{item_code: {barcode: price}} for barcodes bound to an active shelf price."""
+    bound = {}
+    if not item_codes or not frappe.db.table_exists("Shelf Price"):
+        return bound
+    for s in frappe.db.sql("""
+        SELECT item_code, price, barcode
+        FROM `tabShelf Price`
+        WHERE item_code IN %s AND price_list = %s AND active = 1 AND IFNULL(barcode, '') != ''
+    """, [list(item_codes), price_list], as_dict=True):
+        bound.setdefault(s.item_code, {})[s.barcode] = flt(s.price)
+    return bound
+
+
+def _label_barcode(item_code, price, barcodes, bound):
+    """The barcode for a label at `price` (shelf prices, v1.1.1): the one bound to
+    that price; else the first barcode not bound to ANOTHER active price (the POS
+    then asks for the price); else the item code. A label must never carry a
+    barcode that sells at a different price."""
+    item_bound = bound.get(item_code, {})
+    for code, p in item_bound.items():
+        if abs(p - flt(price)) < 0.005:
+            return code
+    for code in barcodes:
+        if code not in item_bound:
+            return code
+    return item_code
+
+
+@frappe.whitelist()
+def get_label_data(rows, price_list=None):
+    """Barcode and price for each label row [{item_code, price}] — price is the
+    line's printed MRP, or empty for the current selling price."""
+    if isinstance(rows, str):
+        rows = json.loads(rows)
+    rows = rows or []
+    item_codes = list({r.get("item_code") for r in rows if r.get("item_code")})
+    if not item_codes:
+        return []
+    details = get_item_details(json.dumps(item_codes), price_list)
+    if not price_list:
+        price_list = frappe.db.get_single_value("Barcode Print Settings", "default_price_list") or "Standard Selling"
+    barcodes = frappe.db.sql("""
+        SELECT parent, barcode FROM `tabItem Barcode` WHERE parent IN %s ORDER BY idx ASC
+    """, [item_codes], as_dict=True)
+    all_barcodes = {}
+    for b in barcodes:
+        all_barcodes.setdefault(b.parent, []).append(b.barcode)
+    bound = _active_price_barcodes(item_codes, price_list)
+    out = []
+    for r in rows:
+        code = r.get("item_code")
+        price = flt(r.get("price")) or flt((details.get(code) or {}).get("selling_rate"))
+        out.append({
+            "barcode": _label_barcode(code, price, all_barcodes.get(code, []), bound) if code else "",
+            "selling_rate": price,
+        })
+    return out
 
 
 @frappe.whitelist()

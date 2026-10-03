@@ -73,15 +73,17 @@ A default label size (35x15mm 2-up) is created automatically during installation
 3. Select items and quantities
 4. Click **Print Barcodes**
 
-## Shelf Prices (v1.1.0)
+## Shelf Prices (v1.1.0, audit fixes v1.1.1)
 
 One item, on the shelf at more than one printed price — old stock at the old MRP,
 new stock at the new one — instead of a second Item for the same product.
 
-**Receiving.** On a Purchase Receipt or Purchase Invoice line, fill
-**Selling Price on Pack (MRP)** (per stock unit) only when the price printed on the
-goods differs from today's selling price. Saving the draft shows what will change;
-submitting applies it:
+**Receiving.** On a Purchase Receipt line, or a Purchase Invoice line with
+**Update Stock**, fill **Printed MRP per Stock Unit** — the price printed on ONE
+piece, not the whole box — only when it differs from today's selling price. A bill
+made from a Purchase Receipt never applies prices again (it shows the receipt's
+price barcode for its labels). A pack price on a Box/Packet line is refused. Saving
+the draft shows what will change; submitting applies it:
 
 | New printed price | What happens |
 |---|---|
@@ -91,18 +93,25 @@ submitting applies it:
 | Item had no price | It gets this one |
 
 Returns to the supplier never change prices. A problem on one line is rolled back,
-logged (Error Log) and shown in red — the receipt itself always submits.
+logged (Error Log) and shown in red — the receipt itself always submits. Cancelling
+does NOT undo prices (later documents may rely on them): it lists the prices it set
+that are still in force (Item Price note "Shelf price set by …").
 
 **New barcode (optional).** Tick **New Barcode for This Price** to give the price
-its own shop barcode — the next free `1xxxxx` number, added to the Item. The line's
-**Price Barcode** shows it, and **Print Barcode Labels** prints that barcode and price.
+its own shop barcode — the next free 6-digit `1xxxxx` number after the highest in use
+(skipping used ones), added to the Item. The line's **Price Barcode** shows it, and
+**Print Barcode Labels** prints that barcode and price. A label never carries a barcode
+that is bound to a different price.
 
 **Selling.** In POS Awesome (fork ≥ 2.7.0) and on desk Sales Invoices:
 - scanning a price's own barcode sells at that price;
 - any other way of adding an item with two or more active prices asks
   *Which price is printed on this copy?* (keys 1–9, click, Esc = do not add);
 - the usual discounts apply on top of the chosen price; it is saved on the line as
-  **Shelf Price (printed on the copy)**.
+  **Shelf Price (printed on the copy)**;
+- on desk, Esc removes the row; the POS refreshes its list of prices when it is
+  older than 30 s before deciding, and warns when the list cannot be loaded;
+- only the default selling price list in company currency is affected.
 
 **Housekeeping.** The **Shelf Price** list shows every price by item. Untick
 **On the Shelf** when the copies at a price are gone — prices are never switched off
