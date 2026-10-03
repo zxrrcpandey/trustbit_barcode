@@ -117,12 +117,21 @@ var trustbit_shelf = {
 				finish(prices[+e.currentTarget.dataset.i].price);
 			});
 
+			// Keys are read on the whole page (capture phase): the POS moves the
+			// cursor back to its search box whenever an item is added, which a
+			// scan made while the picker is open does.
 			let last_key_at = 0,
 				pending = null;
-			d.$wrapper.on("keydown", (e) => {
+			const on_key = (e) => {
 				const now = Date.now(),
 					burst = now - last_key_at < 50;
 				last_key_at = now;
+				if (e.key === "Escape" && !burst) {
+					e.preventDefault();
+					e.stopPropagation();
+					finish(null);
+					return;
+				}
 				if (e.key === "Enter") {
 					e.preventDefault();
 					return;
@@ -138,18 +147,27 @@ var trustbit_shelf = {
 					clearTimeout(pending);
 					pending = setTimeout(() => finish(prices[n - 1].price), 80);
 				}
-			});
+			};
+			// Keep the cursor in the picker while it is open: no button has focus,
+			// so a scanner's Enter cannot press one, and nothing types into the
+			// search box behind it.
+			const content = d.$wrapper.find(".modal-content").attr("tabindex", "-1");
+			const keep_focus = (e) => {
+				if (!d.$wrapper[0].contains(e.target)) content.trigger("focus");
+			};
+			document.addEventListener("keydown", on_key, true);
+			document.addEventListener("focusin", keep_focus, true);
 			d.onhide = () => {
 				clearTimeout(pending);
+				document.removeEventListener("keydown", on_key, true);
+				document.removeEventListener("focusin", keep_focus, true);
 				if (!done) {
 					done = true;
 					resolve(null);
 				}
 			};
 			d.show();
-			// Keys go to the dialog, not to the search box behind it; no button
-			// has focus, so a scanner's Enter cannot press one.
-			setTimeout(() => d.$wrapper.find(".modal-content").attr("tabindex", "-1").trigger("focus"), 50);
+			setTimeout(() => content.trigger("focus"), 50);
 		});
 	},
 
@@ -165,8 +183,64 @@ var trustbit_shelf = {
 		if (!row || !flt(row.custom_shelf_price) || frm.doc.docstatus !== 0) return;
 		const target = this.target_rate(row);
 		if (Math.abs(flt(row.price_list_rate) - target) > 0.005) {
+			// ERPNext keeps a discount AMOUNT when the price changes (and turns it
+			// into a new percentage). KGS discounts are percentages: clear the
+			// amount so it is worked out again from the percentage on this price.
+			if (flt(row.discount_percentage)) row.discount_amount = 0;
 			frappe.model.set_value(cdt, cdn, "price_list_rate", target);
 		}
+	},
+
+	/**
+	 * The desk barcode scanner adds a scan to an existing row of the same item.
+	 * For an item on the shelf at several prices, only a row at the scanned
+	 * copy's price may take it; otherwise a new row is made (and the picker
+	 * asks for the price when the barcode does not say).
+	 */
+	patch_desk_scanner() {
+		const Scanner = window.erpnext && erpnext.utils && erpnext.utils.BarcodeScanner;
+		if (!Scanner || Scanner.prototype.__trustbit_shelf) return;
+		const original = Scanner.prototype.get_row_to_modify_on_scan;
+		Scanner.prototype.get_row_to_modify_on_scan = function (item_code, batch_no, uom, barcode) {
+			const shelf = trustbit_shelf;
+			const bound = shelf.price_for_barcode(barcode);
+			const price = bound && bound.item_code === item_code ? bound.price : null;
+			if (price === null && shelf.prices_for(item_code).length < 2) {
+				return original.apply(this, arguments);
+			}
+			const rows = (this.frm.doc[this.items_table_name] || []).filter(
+				(r) => r.item_code === item_code && !(price !== null && Math.abs(flt(r.custom_shelf_price) - price) < 0.005)
+			);
+			// `has_item_scanned` rows are skipped by ERPNext's own matching.
+			const saved = rows.map((r) => r.has_item_scanned);
+			rows.forEach((r) => (r.has_item_scanned = 1));
+			try {
+				return original.apply(this, arguments);
+			} finally {
+				rows.forEach((r, i) => (r.has_item_scanned = saved[i]));
+			}
+		};
+		Scanner.prototype.__trustbit_shelf = true;
+	},
+
+	/**
+	 * ERPNext books a "margin" whenever the rate it holds is above the price
+	 * list rate. On a shelf-price row that is only the old price still in
+	 * flight (a quantity change re-fetches it), and a margin would mean selling
+	 * above the printed price: clear it and let ERPNext recompute the rate.
+	 */
+	no_margin(frm, cdt, cdn) {
+		setTimeout(() => {
+			const row = locals[cdt] && locals[cdt][cdn];
+			if (!row || !flt(row.custom_shelf_price) || frm.doc.docstatus !== 0) return;
+			if (!(row.margin_type && flt(row.margin_rate_or_amount))) return;
+			row.margin_type = "";
+			row.margin_rate_or_amount = 0;
+			row.rate_with_margin = 0;
+			if (flt(row.discount_percentage)) row.discount_amount = 0;
+			row.price_list_rate = this.target_rate(row);
+			frm.script_manager.trigger("price_list_rate", cdt, cdn);
+		}, 0);
 	},
 
 	set_choice(frm, cdt, cdn, price) {
@@ -202,12 +276,25 @@ var trustbit_shelf = {
 
 window.trustbit_shelf = trustbit_shelf;
 
+frappe.ui.form.on("Sales Invoice", {
+	onload(frm) {
+		trustbit_shelf.patch_desk_scanner();
+		trustbit_shelf.ensure();
+	},
+	refresh(frm) {
+		if (frm.doc.docstatus === 0) trustbit_shelf.ensure();
+	},
+});
+
 frappe.ui.form.on("Sales Invoice Item", {
 	item_code(frm, cdt, cdn) {
 		trustbit_shelf.on_item_code(frm, cdt, cdn);
 	},
 	price_list_rate(frm, cdt, cdn) {
 		trustbit_shelf.keep_price(frm, cdt, cdn);
+	},
+	rate(frm, cdt, cdn) {
+		trustbit_shelf.no_margin(frm, cdt, cdn);
 	},
 	conversion_factor(frm, cdt, cdn) {
 		trustbit_shelf.keep_price(frm, cdt, cdn);

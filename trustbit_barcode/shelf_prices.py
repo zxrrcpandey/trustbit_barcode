@@ -162,6 +162,7 @@ def add_item_barcode(item_code, barcode):
 			"parentfield": "barcodes",
 			"idx": cint(idx) + 1,
 			"barcode": barcode,
+			"uom": frappe.db.get_value("Item", item_code, "stock_uom"),
 		}
 	).db_insert()
 	frappe.clear_document_cache("Item", item_code)
